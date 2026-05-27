@@ -1,0 +1,71 @@
+@startuml
+!theme plain
+
+actor Пользователь
+
+box "Docker Compose" #f0f4ff
+    participant Nginx
+    participant API as "API\n(FastAPI)"
+    participant RabbitMQ
+    participant Worker as "Worker\n(Pillow)"
+    database Storage as "Storage\n/storage"
+end box
+
+== Старт API ==
+
+API -> RabbitMQ : ожидание подключения\n(retry loop)
+RabbitMQ --> API : соединение установлено\n(одно на всё время работы)
+
+== Загрузка файлов ==
+
+Пользователь -> Nginx : POST /upload\n(files, resize_mode, width, height)
+Nginx -> API : проксирует запрос
+
+API -> API : валидация типов файлов\n(JPEG, PNG, GIF, WEBP)
+
+alt недопустимый тип файла
+    API --> Пользователь : 400 Bad Request\n"недопустимый тип файла"
+else все файлы валидны
+    loop для каждого файла
+        API -> Storage : сохраняет {uuid}_original.jpg
+        API -> RabbitMQ : публикует задачу\n{task_id, path, mode, width, height}
+    end
+    API --> Nginx : {task_ids[], resize_mode, target_size}
+    Nginx --> Пользователь : 200 OK
+end
+
+== Обработка (асинхронно) ==
+
+RabbitMQ -> Worker : задача (basic_consume)
+Worker -> Storage : читает {uuid}_original.jpg
+Worker -> Worker : resize_image()\nstretch / fit / fill
+
+alt успешно
+    Worker -> Storage : сохраняет {uuid}_result.jpg
+    Worker -> RabbitMQ : basic_ack
+else ошибка
+    Worker -> Storage : сохраняет {uuid}_error.txt
+    Worker -> RabbitMQ : basic_ack
+end
+
+== Проверка статуса ==
+
+Пользователь -> Nginx : GET /status/{task_id}
+Nginx -> API : проксирует запрос
+API -> API : валидация task_id\n(проверка UUID формата)
+
+alt невалидный task_id
+    API --> Пользователь : 400 Bad Request\n"Некорректный task_id"
+else валидный task_id
+    API -> Storage : проверяет наличие файлов
+
+    alt {uuid}_result.jpg существует
+        API --> Пользователь : {status: "done"}
+    else {uuid}_error.txt существует
+        API --> Пользователь : {status: "error", reason: "..."}
+    else файлов нет
+        API --> Пользователь : {status: "processing"}
+    end
+end
+
+@enduml

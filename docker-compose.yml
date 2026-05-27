@@ -1,0 +1,43 @@
+name: image-processing
+
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"       # порт для подключения сервисов
+      - "15672:15672"     # веб-интерфейс RabbitMQ (логин: guest / guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./api
+    volumes:
+      - ./storage:/storage   
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+
+  worker:
+    build: ./worker
+    volumes:
+      - ./storage:/storage    
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"             
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - api
