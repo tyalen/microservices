@@ -23,22 +23,12 @@ docker compose up --scale worker=3 --scale api=2
 ## Загрузка изображений
 
 ```bash
-curl.exe -X POST http://localhost/upload \
-  -F "files=@C:/path/to/image.jpg" \
-  -F "resize_mode=stretch" \
-  -F "width=800" \
-  -F "height=800"
+curl.exe -X POST http://localhost/upload \-F "files=@C:/path/to/image.jpg" \-F "resize_mode=stretch" \-F "width=800" \-F "height=800"
 ```
 
 Несколько файлов сразу:
 ```bash
-curl.exe -X POST http://localhost/upload \
-  -F "files=@C:/path/to/image1.jpg" \
-  -F "files=@C:/path/to/image2.jpg" \
-  -F "files=@C:/path/to/image3.png" \
-  -F "resize_mode=fit" \
-  -F "width=1920" \
-  -F "height=1080"
+curl.exe -X POST http://localhost/upload \-F "files=@C:/path/to/image1.jpg" \-F "files=@C:/path/to/image2.jpg" \-F "files=@C:/path/to/image3.png" \-F "resize_mode=fit" \-F "width=1920" \-F "height=1080"
 ```
 
 ### Режимы ресайза (`resize_mode`)
